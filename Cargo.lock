@@ -139,6 +139,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
+name = "pod-toleration-policy"
+version = "0.1.0"
+dependencies = [
+ "k8s-openapi",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "yasec",
+ "yasec_derive",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "0.4.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,18 +184,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2 1.0.24",
-]
-
-[[package]]
-name = "real-policy-rust"
-version = "0.1.0"
-dependencies = [
- "k8s-openapi",
- "serde",
- "serde_derive",
- "serde_json",
- "yasec",
- "yasec_derive",
 ]
 
 [[package]]
