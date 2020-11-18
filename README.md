@@ -83,6 +83,12 @@ You can find more example files under the `test_data` directory.
 
 # Benchmark
 
+The following command can be used to benchmark the WASM module:
+
 ```
 $ make bench
 ```
+
+The benchmarks execute the WASM module via
+[wasmtime](https://github.com/bytecodealliance/wasmtime).
+The execution times are measured by [hyperfine](https://github.com/sharkdp/hyperfine).
