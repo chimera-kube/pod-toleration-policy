@@ -32,7 +32,10 @@ fn main() -> std::result::Result<(), std::io::Error> {
         let response: ValidationResponse = eval(&data, &config)?;
         println!("{}", serde_json::to_string(&response)?);
     } else {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "could not initialize config object"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "could not initialize config object",
+        ));
     }
 
     Ok(())
@@ -174,7 +177,8 @@ mod tests {
     }
 
     #[test]
-    fn allow_creation_because_taint_is_not_tracked_by_policy() -> std::result::Result<(), std::io::Error> {
+    fn allow_creation_because_taint_is_not_tracked_by_policy(
+    ) -> std::result::Result<(), std::io::Error> {
         let mut file = File::open("test_data/req_pod_with_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
@@ -189,7 +193,8 @@ mod tests {
     }
 
     #[test]
-    fn allow_creation_because_pod_does_not_have_tolerations() -> std::result::Result<(), std::io::Error> {
+    fn allow_creation_because_pod_does_not_have_tolerations(
+    ) -> std::result::Result<(), std::io::Error> {
         let mut file = File::open("test_data/req_pod_without_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
