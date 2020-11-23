@@ -133,7 +133,7 @@
           "tolerationSeconds": 300
         },
         {
-          "key": "example-key",
+          "key": "dedicated",
           "operator": "Exists",
           "effect": "NoSchedule"
         }

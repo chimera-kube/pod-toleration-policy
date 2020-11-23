@@ -15,8 +15,8 @@ use std::io::{self, Read};
 mod config;
 use config::Config;
 
-mod toleration;
-use toleration::Toleration;
+mod taint;
+use taint::Taint;
 
 #[derive(Serialize, Debug)]
 struct ValidationResponse {
@@ -66,13 +66,28 @@ fn eval(raw: &str, config: &Config) -> Result<ValidationResponse> {
     }
     let podspec = pod.unwrap().spec.unwrap();
 
-    let toleration_found = podspec.tolerations.map_or(false, |tolerations| {
-        tolerations.iter().any(|t| {
-            t.key.as_deref() == Some(config.toleration.key.as_str())
-                && t.operator.as_deref() == Some(config.toleration.operator.as_str())
-                && t.effect.as_deref() == Some(config.toleration.effect.as_str())
-        })
-    });
+    let mut toleration_found = false;
+    if let Some(tolerations) = podspec.tolerations {
+        for toleration in tolerations.iter() {
+            if toleration.key.as_deref() != Some(config.taint.key.as_str()) {
+                continue;
+            }
+            // the toleration has the same key as the protected taint
+            if toleration.operator.as_deref() == Some("Exists") {
+                return Ok(ValidationResponse{
+                    accepted: false,
+                    message: Some(format!(
+                        "Nobody can use the protected taint '{}' with the operation 'Exists'",
+                        config.taint.key)),
+                })
+            }
+            // it means the toleration operator is `Equal`
+            if toleration.value.as_deref() == Some(config.taint.value.as_str()) {
+                toleration_found = true;
+                break;
+            }
+        }
+    }
 
     if !toleration_found {
         return Ok(ValidationResponse {
@@ -121,8 +136,8 @@ fn eval(raw: &str, config: &Config) -> Result<ValidationResponse> {
     Ok(ValidationResponse {
         accepted: false,
         message: Some(format!(
-            "User not allowed to create Pod objects with toleration: {}",
-            config.toleration
+            "User not allowed to create Pods that tolerate the taint {}",
+            config.taint
         )),
     })
 }
@@ -133,12 +148,11 @@ mod tests {
     use std::fs::File;
 
     macro_rules! configuration {
-        (key: $key:tt, operator: $operator:tt, allowed_users: $users:expr, allowed_groups: $groups:expr) => {
+        (key: $key:tt, value: $value:tt, allowed_users: $users:expr, allowed_groups: $groups:expr) => {
             Config {
-                toleration: Toleration {
-                    effect: String::from("NoSchedule"),
+                taint: Taint{
                     key: String::from($key),
-                    operator: String::from($operator),
+                    value: String::from($value),
                 },
                 allowed_users: $users,
                 allowed_groups: $groups,
@@ -148,11 +162,11 @@ mod tests {
 
     #[test]
     fn allow_creation_because_of_matching_username() -> std::result::Result<(), std::io::Error> {
-        let mut file = File::open("test_data/req_pod_with_toleration.json")?;
+        let mut file = File::open("test_data/req_pod_with_equal_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "example-key", operator: "Exists", allowed_users: Some("admin,kubernetes-admin".into()), allowed_groups: None);
+        let config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("admin,kubernetes-admin".into()), allowed_groups: None);
         let result = eval(&raw, &config)?;
 
         assert!(result.accepted);
@@ -163,11 +177,11 @@ mod tests {
 
     #[test]
     fn allow_creation_because_of_matching_group() -> std::result::Result<(), std::io::Error> {
-        let mut file = File::open("test_data/req_pod_with_toleration.json")?;
+        let mut file = File::open("test_data/req_pod_with_equal_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "example-key", operator: "Exists", allowed_users: None, allowed_groups: Some("system:masters,my-admin-group".into()));
+        let config = configuration!(key: "example-key", value: "tenantA", allowed_users: None, allowed_groups: Some("system:masters,my-admin-group".into()));
         let result = eval(&raw, &config)?;
 
         assert!(result.accepted);
@@ -179,11 +193,11 @@ mod tests {
     #[test]
     fn allow_creation_because_taint_is_not_tracked_by_policy(
     ) -> std::result::Result<(), std::io::Error> {
-        let mut file = File::open("test_data/req_pod_with_toleration.json")?;
+        let mut file = File::open("test_data/req_pod_with_equal_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "another-key", operator: "Exists", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
+        let config = configuration!(key: "another-key", value: "another-value", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
         let result = eval(&raw, &config)?;
 
         assert!(result.accepted);
@@ -199,7 +213,7 @@ mod tests {
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "another-key", operator: "Exists", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
+        let config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
         let result = eval(&raw, &config)?;
 
         assert!(result.accepted);
@@ -210,21 +224,49 @@ mod tests {
 
     #[test]
     fn reject_creation_because_of_not_allowed() -> std::result::Result<(), std::io::Error> {
-        let mut file = File::open("test_data/req_pod_with_toleration.json")?;
+        let mut file = File::open("test_data/req_pod_with_equal_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "example-key", operator: "Exists", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
+        let config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
         let result = eval(&raw, &config)?;
 
         assert!(!result.accepted);
         assert_eq!(
             result.message,
-            Some("User not allowed to create Pod objects with toleration: key: example-key, operator: Exists, effect: NoSchedule)".into()),
+            Some("User not allowed to create Pods that tolerate the taint key: dedicated, value : tenantA".into()),
         );
 
         Ok(())
     }
+
+    #[test]
+    fn reject_creation_because_nobody_can_use_the_exists_toleration() -> std::result::Result<(), std::io::Error> {
+        let mut file = File::open("test_data/req_pod_with_exists_toleration.json")?;
+        let mut raw = String::new();
+        file.read_to_string(&mut raw)?;
+
+        let mut config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("tenantB".into()));
+        let mut result = eval(&raw, &config)?;
+
+        assert!(!result.accepted);
+        assert_eq!(
+            result.message,
+            Some("Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'".into()),
+        );
+
+        config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("system:masters".into()));
+        result = eval(&raw, &config)?;
+
+        assert!(!result.accepted);
+        assert_eq!(
+            result.message,
+            Some("Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'".into()),
+        );
+
+        Ok(())
+    }
+
 
     #[test]
     fn accept_because_delete_operation() -> std::result::Result<(), std::io::Error> {
@@ -232,7 +274,7 @@ mod tests {
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
 
-        let config = configuration!(key: "example-key", operator: "Exists", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
+        let config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
         let result = eval(&raw, &config)?;
 
         assert!(result.accepted);

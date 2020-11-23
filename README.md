@@ -33,7 +33,7 @@ the `toleration` required to be running on the reserved nodes.
 The policy does that by inspecting `CREATE` and `UPDATE` requests of
 `Pod` resources.
 
-## Examples
+# Usage
 
 Let's assume some nodes of the cluster have been tainted in this way by
 the cluster operator:
@@ -47,7 +47,8 @@ $ # goes on...
 That means regular workloads, regardless of the tenant, will never be scheduled
 to these nodes.
 
-Only workloads defined with the right toleration will be schedulable on them.
+Only workloads defined with the right toleration can be scheduled on them.
+
 For example, this workload could be scheduled on one of these nodes:
 
 ```yaml
@@ -67,7 +68,7 @@ spec:
     effect: "NoSchedule"
 ```
 
-This workload would be schedulable on the reserved nodes as well:
+Also this workload could be scheduled on the reserved nodes:
 
 ```yaml
 apiVersion: v1
@@ -85,8 +86,15 @@ spec:
     effect: "NoSchedule"
 ```
 
-This policy ensures only trusted users or users who belong to a trusted group
-can write workloads with the `tolerations` specified above.
+**Note well:** a toleration with the `Exists` operator could be abused by
+an evil user to allow his workloads to be scheduled on a dedicated node.
+
+This policy allows the cluster operator to define a taint to be "protected".
+By protecting a taint nobody in the cluster will be able to tolerate it via the
+`Exists` operator.
+
+Only the trusted users will be allowed to create Pods tolerating the protected
+taint with a toleration that uses the `Equal` operator.
 
 # Configuration
 
@@ -95,13 +103,62 @@ The policy has no hard-coded value for neither the `toleration` nor the
 
 The code will read these settings from the environment variables:
 
-  * `TOLERATION_KEY`: `key` of the toleration. Required.
-  * `TOLERATION_OPERATOR`: `operator` of the toleration. Required.
-  * `TOLERATION_EFFECT`: `effect` of the toleration. Required.
+  * `TAINT_KEY`: `key` of the taint. Required.
+  * `TAINT_VALUE`: `value` of the taint. Required.
   * `ALLOWED_USERS`: comma separated list of users who are allowed to use
     this toleration. Optional.
   * `ALLOWED_GROUPS`: comma separated list of groups who are allowed to use
     this toleration. Optional.
+
+# Example
+
+Given a cluster with:
+
+  * Two groups of users: `tenantA-users` and `tenantB-users`
+  * Some nodes tainted with the taint `dedicated:tenantA`
+
+A policy instantiated with this configuration:
+
+  * `TAINT_KEY` = `dedicated`
+  * `TAINT_VALUE` = `tenantA`
+  * `ALLOWED_GROUPS` = `tenantA-users`
+
+A Pod using the following toleration:
+
+```yaml
+  tolerations:
+  - key: "dedicated"
+    operator: "Exists"
+    effect: "NoSchedule"
+```
+
+Would always be rejected by the policy, regardless of the group to which the user
+belongs to.
+
+On the other hand, a Pod defined with this toleration:
+
+```yaml
+  tolerations:
+  - key: "dedicated"
+    operator: "Equal"
+    value: "tenantA"
+    effect: "NoSchedule"
+```
+
+Would be accepted only when created by a user who belongs to the group `tenantA`.
+
+Finally, a Pod with the following toleration:
+
+```yaml
+  tolerations:
+  - key: "dedicated"
+    operator: "Equal"
+    value: "experiments"
+    effect: "NoSchedule"
+```
+
+Would never be rejected by the policy.
+
 
 # Requirements
 
