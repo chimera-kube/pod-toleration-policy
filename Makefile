@@ -12,8 +12,12 @@ registry:
 publish: build registry
 	wasm-to-oci push target/wasm32-wasi/release/pod-toleration-policy.wasm localhost:5000/admission-wasm/pod-toleration-policy:v1
 
+.PHONY: fmt
+fmt:
+	cargo fmt --all -- --check
+
 .PHONY: test
-test:
+test: fmt
 	cargo test
 
 .PHONY: clean
