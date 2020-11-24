@@ -3,7 +3,7 @@ use yasec::Yasec;
 
 #[derive(Yasec, Debug)]
 pub(crate) struct Config {
-    pub toleration: crate::Toleration,
+    pub taint: crate::Taint,
     pub allowed_groups: Option<String>,
     pub allowed_users: Option<String>,
 }
