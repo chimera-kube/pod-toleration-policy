@@ -9,10 +9,6 @@ pub(crate) struct Taint {
 
 impl fmt::Display for Taint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "key: {}, value : {}",
-            self.key, self.value
-        )
+        write!(f, "key: {}, value : {}", self.key, self.value)
     }
 }

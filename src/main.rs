@@ -74,12 +74,13 @@ fn eval(raw: &str, config: &Config) -> Result<ValidationResponse> {
             }
             // the toleration has the same key as the protected taint
             if toleration.operator.as_deref() == Some("Exists") {
-                return Ok(ValidationResponse{
+                return Ok(ValidationResponse {
                     accepted: false,
                     message: Some(format!(
                         "Nobody can use the protected taint '{}' with the operation 'Exists'",
-                        config.taint.key)),
-                })
+                        config.taint.key
+                    )),
+                });
             }
             // it means the toleration operator is `Equal`
             if toleration.value.as_deref() == Some(config.taint.value.as_str()) {
@@ -150,7 +151,7 @@ mod tests {
     macro_rules! configuration {
         (key: $key:tt, value: $value:tt, allowed_users: $users:expr, allowed_groups: $groups:expr) => {
             Config {
-                taint: Taint{
+                taint: Taint {
                     key: String::from($key),
                     value: String::from($value),
                 },
@@ -241,7 +242,8 @@ mod tests {
     }
 
     #[test]
-    fn reject_creation_because_nobody_can_use_the_exists_toleration() -> std::result::Result<(), std::io::Error> {
+    fn reject_creation_because_nobody_can_use_the_exists_toleration(
+    ) -> std::result::Result<(), std::io::Error> {
         let mut file = File::open("test_data/req_pod_with_exists_toleration.json")?;
         let mut raw = String::new();
         file.read_to_string(&mut raw)?;
@@ -252,7 +254,10 @@ mod tests {
         assert!(!result.accepted);
         assert_eq!(
             result.message,
-            Some("Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'".into()),
+            Some(
+                "Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'"
+                    .into()
+            ),
         );
 
         config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("system:masters".into()));
@@ -261,12 +266,14 @@ mod tests {
         assert!(!result.accepted);
         assert_eq!(
             result.message,
-            Some("Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'".into()),
+            Some(
+                "Nobody can use the protected taint \'dedicated\' with the operation \'Exists\'"
+                    .into()
+            ),
         );
 
         Ok(())
     }
-
 
     #[test]
     fn accept_because_delete_operation() -> std::result::Result<(), std::io::Error> {
