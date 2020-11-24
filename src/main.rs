@@ -289,4 +289,19 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn accept_because_not_a_pod_related_operation() -> std::result::Result<(), std::io::Error> {
+        let mut file = File::open("test_data/req_not_a_pod.json")?;
+        let mut raw = String::new();
+        file.read_to_string(&mut raw)?;
+
+        let config = configuration!(key: "dedicated", value: "tenantA", allowed_users: Some("alice,bob".into()), allowed_groups: Some("power-users".into()));
+        let result = eval(&raw, &config)?;
+
+        assert!(result.accepted);
+        assert_eq!(result.message, None);
+
+        Ok(())
+    }
 }
