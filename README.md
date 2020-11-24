@@ -3,7 +3,7 @@
  -----------------------|--------
 ![Continuous integration](https://github.com/chimera-kube/pod-toleration-policy/workflows/Continuous%20integration/badge.svg) | [![License: Apache 2.0](https://img.shields.io/badge/License-Apache2.0-brightgreen.svg)](https://opensource.org/licenses/Apache-2.0)
 
-This project containers a Chimera Policy written using Rust.
+This project defines a Chimera Policy written in Rust.
 
 # The goal
 
@@ -18,11 +18,11 @@ This scenario can be implemented using the concepts of
 built into Kubernetes:
 
   1. Reserved nodes are tainted by the cluster operator. That prevents generic
-    workloads from being scheduled on these nodes.
-  1. Trusted users should put add a special `toleration` to the workloads that
+    workloads from being scheduled on them.
+  1. Trusted users should put add a "special" `toleration` to the workloads that
     must be scheduled on their reserved nodes.
   1. Untrusted users should not be able to fool the Kubernetes scheduler by
-    adding the special `toleration` used by the trusted users.
+    adding the "special" `toleration` used by the trusted users.
 
 Unfortunately Kubernetes doesn't have any built-in mechanism that can solve
 the last point. This is a task for a specially crafted dynamic admissions
@@ -30,6 +30,7 @@ controller, like [Chimera](https://github.com/chimera-kube/chimera-admission).
 
 This Chimera Policy ensures only trusted users can schedule workloads that have
 the `toleration` required to be running on the reserved nodes.
+
 The policy does that by inspecting `CREATE` and `UPDATE` requests of
 `Pod` resources.
 
@@ -89,6 +90,8 @@ spec:
 **Note well:** a toleration with the `Exists` operator could be abused by
 an evil user to allow his workloads to be scheduled on a dedicated node.
 
+# How the policy works
+
 This policy allows the cluster operator to define a taint to be "protected".
 By protecting a taint nobody in the cluster will be able to tolerate it via the
 `Exists` operator.
@@ -98,8 +101,8 @@ taint with a toleration that uses the `Equal` operator.
 
 # Configuration
 
-The policy has no hard-coded value for neither the `toleration` nor the
-`usernames` or `groups` that are entitled to use the toleration.
+The policy has no hard-coded value neither for the `taint` nor for the
+`usernames` or `groups` that are entitled to tolerate the `taint`.
 
 The code will read these settings from the environment variables:
 
@@ -117,7 +120,7 @@ Given a cluster with:
   * Two groups of users: `tenantA-users` and `tenantB-users`
   * Some nodes tainted with the taint `dedicated:tenantA`
 
-A policy instantiated with this configuration:
+And a policy instantiated with this configuration:
 
   * `TAINT_KEY` = `dedicated`
   * `TAINT_VALUE` = `tenantA`
@@ -132,7 +135,7 @@ A Pod using the following toleration:
     effect: "NoSchedule"
 ```
 
-Would always be rejected by the policy, regardless of the group to which the user
+Will always be rejected by the policy, regardless of the group to which the user
 belongs to.
 
 On the other hand, a Pod defined with this toleration:
@@ -145,7 +148,7 @@ On the other hand, a Pod defined with this toleration:
     effect: "NoSchedule"
 ```
 
-Would be accepted only when created by a user who belongs to the group `tenantA`.
+Will be accepted only when created by a user who belongs to the group `tenantA-users`.
 
 Finally, a Pod with the following toleration:
 
@@ -159,18 +162,13 @@ Finally, a Pod with the following toleration:
 
 Would never be rejected by the policy.
 
+# Building
 
-# Requirements
+Handle the rust installation using rustup. Then add the `wasm32-wasi` target:
 
-Handle the rust installation using rustup.
-
-```bash
+```shell
 $ rustup target add wasm32-wasi
 ```
-
-The snippet above adds a new target called `wasm32-wasi`.
-
-# Building
 
 Use this command to build the WASM code:
 
@@ -184,18 +182,18 @@ This will produce a `.wasm` file under `target/wasm32-wasi/release/`.
 
 The policy is a stand-alone WASM module, you can invoke it in this way:
 
-```bash
-$ cat test_data/req_pod_with_toleration.json | wasmtime run --env TOLERATION_EFFECT="NoSchedule" \
-               --env TOLERATION_KEY="example-key" \
-               --env TOLERATION_OPERATOR="Exists" \
-               --env ALLOWED_GROUPS="administrators" \
-               target/wasm32-wasi/release/real-policy-rust.wasm
+```shell
+$ cat test_data/req_pod_with_equal_toleration.json | wasmtime run \
+              --env TAINT_KEY="dedicated" \
+              --env TAINT_VALUE="tenantA" \
+              --env ALLOWED_GROUPS="administrators" \
+              target/wasm32-wasi/release/pod-toleration-policy.wasm
 ```
 
 This will produce the following output:
 
-```bash
-{"accepted":false,"message":"User not allowed to create Pod objects with toleration: key: example-key, operator: Exists, effect: NoSchedule)"}
+```shell
+{"accepted":false,"message":"User not allowed to create Pods that tolerate the taint key: dedicated, value : tenantA"}
 ```
 
 You can find more example files under the `test_data` directory.
