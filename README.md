@@ -170,7 +170,7 @@ Handle the rust installation using rustup. Then add the `wasm32-wasi` target:
 $ rustup target add wasm32-wasi
 ```
 
-Use this command to build the WASM code:
+Use this command to build the Wasm code:
 
 ```
 $ make build
@@ -180,7 +180,7 @@ This will produce a `.wasm` file under `target/wasm32-wasi/release/`.
 
 # Trying the policy
 
-The policy is a stand-alone WASM module, you can invoke it in this way:
+The policy is a stand-alone Wasm module, you can invoke it in this way:
 
 ```shell
 $ cat test_data/req_pod_with_equal_toleration.json | wasmtime run \
@@ -200,12 +200,12 @@ You can find more example files under the `test_data` directory.
 
 # Benchmark
 
-The following command can be used to benchmark the WASM module:
+The following command can be used to benchmark the Wasm module:
 
 ```
 $ make bench
 ```
 
-The benchmarks execute the WASM module via
+The benchmarks execute the Wasm module via
 [wasmtime](https://github.com/bytecodealliance/wasmtime).
 The execution times are measured by [hyperfine](https://github.com/sharkdp/hyperfine).
