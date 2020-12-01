@@ -113,6 +113,14 @@ The code will read these settings from the environment variables:
   * `ALLOWED_GROUPS`: comma separated list of groups who are allowed to use
     this toleration. Optional.
 
+# Obtain policy
+
+The policy is automatically published as an OCI artifact inside of
+[this](https://github.com/orgs/chimera-kube/packages/container/package/policies%2Fpod-toleration)
+container registry:
+
+
+
 # Example
 
 Given a cluster with:
