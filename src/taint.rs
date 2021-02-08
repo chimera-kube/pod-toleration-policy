@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use yasec::Yasec;
 
-#[derive(Yasec, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub(crate) struct Taint {
     pub key: String,
     pub value: String,

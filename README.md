@@ -104,22 +104,33 @@ taint with a toleration that uses the `Equal` operator.
 The policy has no hard-coded value neither for the `taint` nor for the
 `usernames` or `groups` that are entitled to tolerate the `taint`.
 
-The code will read these settings from the environment variables:
+The policy can be configured with the following data structure:
 
-  * `TAINT_KEY`: `key` of the taint. Required.
-  * `TAINT_VALUE`: `value` of the taint. Required.
-  * `ALLOWED_USERS`: comma separated list of users who are allowed to use
-    this toleration. Optional.
-  * `ALLOWED_GROUPS`: comma separated list of groups who are allowed to use
-    this toleration. Optional.
+```yml
+taint:
+  key: dedicated # replace with the name of the taint
+  value: tenantA # replace with the value of the taint
+allowed_groups: # list of groups
+- administrators
+- system:masters
+allowed_users: # list of users
+- joe
+```
+
+Let's go through each field:
+  * `taint`: dictionary with `key` and `value` keys. This defines the
+    taint to monitor. Required.
+  * `allowed_users`: list of users who are allowed to use this toleration.
+    Optional.
+  * `allowed_groups`: list of groups who are allowed to use this toleration.
+    Optional.
+
 
 # Obtain policy
 
 The policy is automatically published as an OCI artifact inside of
 [this](https://github.com/orgs/chimera-kube/packages/container/package/policies%2Fpod-toleration)
 container registry:
-
-
 
 # Example
 
@@ -130,10 +141,13 @@ Given a cluster with:
 
 And a policy instantiated with this configuration:
 
-  * `TAINT_KEY` = `dedicated`
-  * `TAINT_VALUE` = `tenantA`
-  * `ALLOWED_GROUPS` = `tenantA-users`
-
+```yml
+taint:
+  key: dedicated
+  value: tenantA
+allowed_groups:
+- tenantA-users
+```
 A Pod using the following toleration:
 
 ```yaml
@@ -175,7 +189,7 @@ Would never be rejected by the policy.
 Handle the rust installation using rustup. Then add the `wasm32-wasi` target:
 
 ```shell
-$ rustup target add wasm32-wasi
+$ rustup target add wasm32-unknown-unknown
 ```
 
 Use this command to build the Wasm code:
@@ -184,18 +198,23 @@ Use this command to build the Wasm code:
 $ make build
 ```
 
-This will produce a `.wasm` file under `target/wasm32-wasi/release/`.
+This will produce a `.wasm` file under `target/wasm32-unknown-unknown/release/pod_toleration_policy.wasm`.
+
+# Using the policy
+
+The easiest way to use this policy is through the [chimera-controller](https://github.com/chimera-kube/chimera-controller).
 
 # Trying the policy
 
-The policy is a stand-alone Wasm module, you can invoke it in this way:
+The policy can be ran outside of Chimera's [policy-server](https://github.com/chimera-kube/policy-server)
+by using the [chimera-policy-testdrive](https://github.com/chimera-kube/chimera-policy-testdrive)
+CLI tool:
 
 ```shell
-$ cat test_data/req_pod_with_equal_toleration.json | wasmtime run \
-              --env TAINT_KEY="dedicated" \
-              --env TAINT_VALUE="tenantA" \
-              --env ALLOWED_GROUPS="administrators" \
-              target/wasm32-wasi/release/pod-toleration-policy.wasm
+$ chimera-policy-testdrive \
+    --policy target/wasm32-unknown-unknown/release/pod_toleration_policy.wasm \
+    -settings '{"taint": {"key": "dedicated", "value": "tenantA"}, "allowed_groups": ["administrators", "system:masters"]}'
+    --request-file test_data/req_pod_with_equal_toleration.json
 ```
 
 This will produce the following output:
@@ -205,15 +224,3 @@ This will produce the following output:
 ```
 
 You can find more example files under the `test_data` directory.
-
-# Benchmark
-
-The following command can be used to benchmark the Wasm module:
-
-```
-$ make bench
-```
-
-The benchmarks execute the Wasm module via
-[wasmtime](https://github.com/bytecodealliance/wasmtime).
-The execution times are measured by [hyperfine](https://github.com/sharkdp/hyperfine).
